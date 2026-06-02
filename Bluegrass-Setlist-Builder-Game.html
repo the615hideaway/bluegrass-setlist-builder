@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🎸 Bluegrass Setlist Builder</title>
+<style>
+  body { font-family: system-ui, sans-serif; background: #2a2218; color: #f5f0e6; margin: 0; padding: 0; }
+  .header { background: #1a150f; border-bottom: 5px solid #c19a6b; padding: 16px; text-align: center; }
+  h1 { font-size: 2rem; margin: 0; color: #f5f0e6; }
+  .container { max-width: 1100px; margin: 0 auto; padding: 16px; }
+  .card { background: #3a2f1f; border: 1px solid #5c4033; border-radius: 8px; padding: 14px; margin-bottom: 14px; }
+  .song-pool { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; max-height: 320px; overflow-y: auto; }
+  .song-item { background: #2a2218; padding: 6px 8px; border-radius: 4px; cursor: pointer; border: 1px solid #5c4033; font-size: 0.9rem; }
+  .song-item.selected { background: #2e5a2e; border-color: #6a9f6a; }
+  .setlist { min-height: 200px; background: #2a2218; border: 2px dashed #c19a6b; padding: 8px; border-radius: 6px; }
+  .setlist-item { background: #3a2f1f; margin: 4px 0; padding: 6px; border-radius: 4px; display: flex; justify-content: space-between; }
+  button { background: #c19a6b; color: #1a150f; border: none; padding: 8px 14px; border-radius: 5px; cursor: pointer; font-weight: 600; }
+  button:hover { background: #d4af8a; }
+  .score { font-size: 1.6rem; color: #c19a6b; font-weight: 700; }
+  .constraint { font-size: 0.85rem; background: #1a150f; padding: 4px 8px; border-radius: 3px; margin: 2px 0; display: inline-block; }
+  .good { color: #6a9f6a; }
+  .bad { color: #c07070; }
+</style>
+</head>
+<body>
+<div class="header">
+  <h1>🎸 Bluegrass Setlist Builder</h1>
+  <p style="margin:4px 0 0; color:#c19a6b;">Build the perfect festival or radio set from the Top 50 Songs • Score your flow, variety &amp; authenticity</p>
+</div>
+
+<div class="container">
+  <div class="card">
+    <h3 style="margin-top:0;">Your Setlist (pick 10–12 songs)</h3>
+    <div id="setlist" class="setlist"></div>
+    <div style="margin-top:8px;">
+      <button onclick="addRandomSong()">Add Random</button>
+      <button onclick="clearSetlist()">Clear All</button>
+      <button onclick="scoreSetlist()" style="background:#6a9f6a; color:white;">Score My Setlist</button>
+    </div>
+    <div id="score-area" style="margin-top:10px;"></div>
+  </div>
+
+  <div class="card">
+    <h3 style="margin-top:0;">Available Songs (from Top 50)</h3>
+    <div style="margin-bottom:6px; font-size:0.85rem;">Click a song to add it to your setlist. Click again in setlist to remove.</div>
+    <div id="song-pool" class="song-pool"></div>
+  </div>
+
+  <div class="card">
+    <strong>Rules &amp; Scoring Tips (Hard Mode)</strong><br>
+    • Max 2 songs per artist<br>
+    • Must include at least 1 Instrumental and 1 Gospel song<br>
+    • Try for energy flow: slow → mid → fast → slow or big finish<br>
+    • Scoring: +10 per song • +15 variety (different eras/artists) • +20 constraints met • +10 for good flow • Bonuses for real "dream set" combos<br>
+    <span style="color:#c19a6b;">Pro tip for radio DJs: Balance traditional vs modern for broad appeal.</span>
+  </div>
+</div>
+
+<script>
+// Data from Top 50 Songs (abbreviated for game; full lists in the other files)
+const topSongs = [
+  {id:1, title:"Foggy Mountain Breakdown", artist:"Flatt & Scruggs", type:"instrumental", era:"classic", energy:9},
+  {id:2, title:"Blue Moon of Kentucky", artist:"Bill Monroe", type:"vocal", era:"classic", energy:6},
+  {id:3, title:"Rocky Top", artist:"Osborne Brothers", type:"vocal", era:"classic", energy:8},
+  {id:4, title:"I Am a Man of Constant Sorrow", artist:"Stanley Brothers", type:"vocal", era:"classic", energy:5},
+  {id:5, title:"Rank Stranger", artist:"Stanley Brothers", type:"gospel", era:"classic", energy:4},
+  {id:6, title:"Orange Blossom Special", artist:"Various", type:"instrumental", era:"classic", energy:9},
+  {id:7, title:"With Body and Soul", artist:"Bill Monroe", type:"vocal", era:"classic", energy:5},
+  {id:10, title:"The Ballad of Jed Clampett", artist:"Flatt & Scruggs", type:"vocal", era:"classic", energy:7},
+  {id:11, title:"Roll in My Sweet Baby's Arms", artist:"Flatt & Scruggs", type:"vocal", era:"classic", energy:8},
+  {id:14, title:"I'll Fly Away", artist:"Alison Krauss & Gillian Welch", type:"gospel", era:"modern", energy:6},
+  {id:15, title:"O Death", artist:"Ralph Stanley", type:"vocal", era:"classic", energy:3},
+  {id:19, title:"The Old Home Place", artist:"J.D. Crowe & The New South", type:"vocal", era:"progressive", energy:6},
+  {id:20, title:"Colleen Malone", artist:"Hot Rize", type:"vocal", era:"modern", energy:5},
+  {id:24, title:"Outrun the Rain", artist:"Jason Carter & Michael Cleveland", type:"vocal", era:"modern", energy:7},
+  {id:28, title:"Will the Circle Be Unbroken", artist:"Nitty Gritty Dirt Band", type:"gospel", era:"classic", energy:5},
+  {id:29, title:"Wagon Wheel", artist:"Old Crow Medicine Show", type:"vocal", era:"modern", energy:7},
+  {id:30, title:"Dueling Banjos", artist:"Various", type:"instrumental", era:"classic", energy:9},
+  {id:37, title:"The Little Mountain Church House", artist:"Doyle Lawson & Quicksilver", type:"gospel", era:"modern", energy:5},
+  {id:39, title:"Black Mountain Rag", artist:"Doc Watson", type:"instrumental", era:"classic", energy:8},
+  {id:41, title:"Bringing Mary Home", artist:"Country Gentlemen", type:"vocal", era:"classic", energy:6}
+];
+
+let setlist = [];
+
+function renderPool() {
+  const pool = document.getElementById('song-pool');
+  pool.innerHTML = '';
+  topSongs.forEach(song => {
+    const div = document.createElement('div');
+    div.className = 'song-item';
+    if (setlist.find(s => s.id === song.id)) div.classList.add('selected');
+    div.innerHTML = `<strong>${song.title}</strong><br><small>${song.artist} • ${song.type} • ${song.era}</small>`;
+    div.onclick = () => toggleSong(song, div);
+    pool.appendChild(div);
+  });
+}
+
+function toggleSong(song, el) {
+  const idx = setlist.findIndex(s => s.id === song.id);
+  if (idx > -1) {
+    setlist.splice(idx, 1);
+    el.classList.remove('selected');
+  } else {
+    if (setlist.length >= 12) {
+      alert('Max 12 songs for a tight set!');
+      return;
+    }
+    setlist.push(song);
+    el.classList.add('selected');
+  }
+  renderSetlist();
+}
+
+function renderSetlist() {
+  const container = document.getElementById('setlist');
+  container.innerHTML = '';
+  if (setlist.length === 0) {
+    container.innerHTML = '<em style="color:#a38c6e;">Your setlist is empty — click songs above to add</em>';
+    return;
+  }
+  setlist.forEach((song, i) => {
+    const div = document.createElement('div');
+    div.className = 'setlist-item';
+    div.innerHTML = `
+      <span>${i+1}. <strong>${song.title}</strong> — ${song.artist} (${song.type})</span>
+      <button onclick="removeFromSetlist(${i})" style="background:#5a2e2e; color:white; padding:2px 6px; font-size:0.7rem;">✕</button>
+    `;
+    container.appendChild(div);
+  });
+}
+
+function removeFromSetlist(index) {
+  setlist.splice(index, 1);
+  renderSetlist();
+  renderPool();
+}
+
+function clearSetlist() {
+  setlist = [];
+  renderSetlist();
+  renderPool();
+}
+
+function addRandomSong() {
+  const available = topSongs.filter(s => !setlist.find(sel => sel.id === s.id));
+  if (available.length === 0) return;
+  const random = available[Math.floor(Math.random() * available.length)];
+  setlist.push(random);
+  renderSetlist();
+  renderPool();
+}
+
+function scoreSetlist() {
+  if (setlist.length < 8) {
+    alert('Add at least 8 songs for a real set!');
+    return;
+  }
+
+  let score = setlist.length * 10;
+  let breakdown = [];
+
+  // Artist variety
+  const artists = new Set(setlist.map(s => s.artist));
+  const varietyBonus = Math.min(30, artists.size * 4);
+  score += varietyBonus;
+  breakdown.push(`Artist variety: +${varietyBonus}`);
+
+  // Type constraints
+  const hasInstrumental = setlist.some(s => s.type === 'instrumental');
+  const hasGospel = setlist.some(s => s.type === 'gospel');
+  if (hasInstrumental && hasGospel) {
+    score += 20;
+    breakdown.push('Both Instrumental + Gospel required: +20');
+  } else {
+    breakdown.push('Missing Instrumental or Gospel: 0');
+  }
+
+  // Energy flow (simple)
+  let flow = 0;
+  for (let i = 1; i < setlist.length; i++) {
+    const diff = Math.abs(setlist[i].energy - setlist[i-1].energy);
+    if (diff <= 2) flow += 2; // smooth transitions
+    if (i === Math.floor(setlist.length/2) && setlist[i].energy > 7) flow += 5; // big middle
+  }
+  const flowBonus = Math.min(15, flow);
+  score += flowBonus;
+  breakdown.push(`Energy flow: +${flowBonus}`);
+
+  // Era mix
+  const eras = new Set(setlist.map(s => s.era));
+  const eraBonus = eras.size * 5;
+  score += eraBonus;
+  breakdown.push(`Era mix (${eras.size} eras): +${eraBonus}`);
+
+  // Special combos (real world famous pairings)
+  const titles = setlist.map(s => s.title);
+  if (titles.includes("Foggy Mountain Breakdown") && titles.includes("The Ballad of Jed Clampett")) {
+    score += 15;
+    breakdown.push("Flatt & Scruggs double feature: +15");
+  }
+  if (titles.includes("I Am a Man of Constant Sorrow") && titles.includes("O Death")) {
+    score += 10;
+    breakdown.push("Stanley Brothers dark duo: +10");
+  }
+
+  const maxPossible = 200;
+  const final = Math.min(maxPossible, score);
+
+  let html = `<div class="score">${final} / ${maxPossible}</div>`;
+  html += '<div style="margin-top:8px;"><strong>Breakdown:</strong><br>' + breakdown.join('<br>') + '</div>';
+  if (final > 160) html += '<div style="color:#6a9f6a; margin-top:6px;">🔥 Killer set! Festival headliner material.</div>';
+  else if (final > 130) html += '<div style="color:#c19a6b;">Solid pro set. Radio would love this.</div>';
+  else html += '<div style="color:#a38c6e;">Good bones — tighten the flow and variety for next time.</div>';
+
+  document.getElementById('score-area').innerHTML = html;
+}
+
+function init() {
+  renderPool();
+  document.getElementById('setlist').innerHTML = '<em style="color:#a38c6e;">Your setlist is empty — click songs above to add</em>';
+}
+init();
+</script>
+</body>
+</html>
